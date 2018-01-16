@@ -97,10 +97,10 @@ void GridCalibrationTargetAprilgrid::createGridPoints() {
 /// \brief extract the calibration target points from an image and write to an observation
 bool GridCalibrationTargetAprilgrid::computeObservation(
     const cv::Mat & image, Eigen::MatrixXd & outImagePoints,
-    std::vector<bool> &outCornerObserved) const {
+    std::vector<bool> &outCornerObserved, bool isDepth) const {
 
   bool success = true;
-
+  
   // detect the tags
   std::vector<AprilTags::TagDetection> detections = _tagDetector->extractTags(image);
 

@@ -161,7 +161,7 @@ def main():
     
     #load calibration target configuration 
     targetConfig = kc.CalibrationTargetParameters(parsed.target_yaml)
-       
+    
     print "Initializing calibration target:"
     targetConfig.printDetails()
     

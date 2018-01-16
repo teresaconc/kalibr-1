@@ -119,7 +119,7 @@ class AslamCamera(object):
 			self.raiseError("Unknown camera model")
 		
 	@classmethod
-	def fromParameters(cls, params):
+	def fromParameters(cls, params, recomputeIntrinsics=False):
 		#get the data
 		camera_model, intrinsics = params.getIntrinsics()
 		dist_model, dist_coeff = params.getDistortion()
@@ -533,7 +533,6 @@ class CalibrationTargetParameters(ParametersBase):
 		
 		targetType = self.getTargetType()
 		targetParams = self.getTargetParams()
-		
 		print >> dest, "  Type: {0}".format(targetType)
 		
 		if targetType == 'checkerboard':        
@@ -549,7 +548,7 @@ class CalibrationTargetParameters(ParametersBase):
 			print >> dest, "    Cols: {0}".format(targetParams['tagCols'])
 			print >> dest, "    Size: {0} [m]".format(targetParams['tagSize'])
 			print >> dest, "    Spacing {0} [m]".format( targetParams['tagSize']*targetParams['tagSpacing'] )
-		elif targetType == 'aprilgrid_assymetric':
+		elif targetType == 'assymetric_aprilgrid':
 			print >> dest, "    Number of Tags: {0}".format(len(targetParams['tags']))
 
 class CameraChainParameters(ParametersBase):

@@ -25,7 +25,7 @@ namespace aslam {
 
 
     /// \brief evaluate the Jacobians.
-    void ErrorTerm::evaluateJacobians(JacobianContainer & outJ) const
+    void ErrorTerm::evaluateJacobians(JacobianContainer & outJ) 
     {
       outJ.clear();
       evaluateJacobiansImplementation(outJ);

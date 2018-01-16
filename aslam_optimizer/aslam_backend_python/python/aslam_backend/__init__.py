@@ -10,6 +10,8 @@ from libaslam_backend_python import *
 class TransformationDv(object):
     def __init__(self, transformation, rotationActive=True, translationActive=True ):
         if not type(transformation) == sm.Transformation:
+            print sm.Transformation(transformation)
+            print type(transformation)
             raise RuntimeError("The transformation must be an sm transformation")
         self.initail_T = transformation
         self.q = RotationQuaternionDv(transformation.q())

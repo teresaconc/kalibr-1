@@ -95,19 +95,18 @@ bool GridDetector::findTargetNoTransformation(const cv::Mat & image, const aslam
   // Extract the calibration target corner points
   Eigen::MatrixXd cornerPoints;
   std::vector<bool> validCorners;
-  
-  success = _target->computeObservation(image, cornerPoints, validCorners);
 
-  // Set the image, target, and timestamp regardless of success.
+  std::vector<int> tagIds;
+  std::cout << "before com\n";
+  success = _target->computeObservation(image, cornerPoints, validCorners,tagIds);
+  std::cout << "num of tagIds " << tagIds.size() << std::endl;
+  // Set the image, target, and timestamp regardlesss of success.
   outObservation.setTarget(_target);
   outObservation.setImage(image);
   outObservation.setTime(stamp);
-
+  outObservation.setTagIds(tagIds);
   // Set the observed corners in the observation
   for (int i = 0; i < cornerPoints.rows(); i++) {
-
-   //if Success we have validCorners and updateImagePoint runs
-
     if (validCorners[i]){
       outObservation.updateImagePoint(i, cornerPoints.row(i).transpose());
     }
@@ -219,7 +218,8 @@ bool GridDetector::findTarget(const cv::Mat & image, const aslam::Time & stamp,
 
 /// \brief Find the target but don't estimate the transformation.
 bool GridDetector::findTargetNoTransformation(const cv::Mat & image,
-                                              GridCalibrationTargetObservation & outObservation) const {
+                                              GridCalibrationTargetObservation & outObservation
+                                          ) const {
   return findTargetNoTransformation(image, aslam::Time(0, 0), outObservation);
 }
 

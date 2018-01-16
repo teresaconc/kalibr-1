@@ -8,7 +8,7 @@ catkin_simple()
 ADD_DEFINITIONS(-DASLAM_USE_ROS )
 
 find_package(Boost REQUIRED COMPONENTS system serialization filesystem)
-
+find_package(OpenCV REQUIRED)
 #common commands for building c++ executables and libraries
 cs_add_library(${PROJECT_NAME} 
   src/CameraGeometryBase.cpp

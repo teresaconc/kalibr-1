@@ -15,7 +15,6 @@
 #include <sm/boost/serialization.hpp>
 #include <sm/assert_macros.hpp>
 
-
 namespace aslam {
 namespace cameras {
 
@@ -79,12 +78,13 @@ class GridCalibrationTargetBase {
   ///        in outImagePoints was observed
   virtual bool computeObservation(const cv::Mat & /*image*/,
                                   Eigen::MatrixXd & /*outImagePoints*/,
-                                  std::vector<bool> & /*outCornerObserved*/
-                                  ) const
+                                  std::vector<bool> & /*outCornerObserved*/,
+  std::vector<int> &tagIds) const
   {
     SM_ASSERT_TRUE(Exception, true, "you need to implement this method for each target!");
     return false;
   };
+   
 
   /// \brief return pointer to the i-th grid point in target frame
   double * getPointDataPointer(size_t i);

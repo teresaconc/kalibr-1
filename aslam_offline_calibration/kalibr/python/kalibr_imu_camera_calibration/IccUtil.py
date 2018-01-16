@@ -61,7 +61,8 @@ def printResults(cself, withCov=False):
             print "\t quaternion: ", T_cam_b.q(), " +- ", cself.std_trafo_ic[0:3]
             print "\t translation: ", T_cam_b.t(), " +- ", cself.std_trafo_ic[3:]
         print T_cam_b.T()
-        
+        if camNr == 0:
+            print 
         if not cself.noTimeCalibration:
             print
             print "cam{0} to imu0 time: [s] (t_imu = t_cam + shift)".format(camNr)

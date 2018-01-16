@@ -34,7 +34,7 @@ class IccCalibrator(object):
 
         # Add the calibration target orientation design variable. (expressed as gravity vector in target frame)
         if estimateGravityLength:
-            self.gravityDv = aopt.EuclideanPointDv( initialGravityEstimate )
+            self.gravityDv = aopt.EuclideanPointDvF( initialGravityEstimate )
         else:
             self.gravityDv = aopt.EuclideanDirection( initialGravityEstimate )
         self.gravityExpression = self.gravityDv.toExpression()  
@@ -47,6 +47,9 @@ class IccCalibrator(object):
         
         #Add all DVs for the camera chain    
         self.CameraChain.addDesignVariables( problem, noTimeCalibration, noChainExtrinsics )
+
+
+        #Add all DVs for target position
 
     def addPoseMotionTerms(self, problem, tv, rv):
         wt = 1.0/tv;

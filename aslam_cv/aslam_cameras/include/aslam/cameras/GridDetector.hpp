@@ -92,7 +92,7 @@ class GridDetector {
   bool initCameraGeometryFromObservations(boost::shared_ptr<std::vector<cv::Mat> > images_ptr);
 
   /// \brief get the underlying geometry
-  boost::shared_ptr<CameraGeometryBase> geometry( ) const {
+  boost::shared_ptr<CameraGeometryBase> geometry() const {
     return _geometry;
   };
 
@@ -114,7 +114,7 @@ class GridDetector {
 
   /// \brief Find the target but don't estimate the transformation.
   bool findTargetNoTransformation(const cv::Mat &image, const aslam::Time &stamp,
-      GridCalibrationTargetObservation & outObservation) const;
+      GridCalibrationTargetObservation & outObservation) const ;
 
   /// \brief Find the target but don't estimate the transformation.
   bool findTargetNoTransformation(const cv::Mat &image,

@@ -762,6 +762,7 @@ bool OmniProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<GridCa
         Eigen::Vector2d imagePoint;
         Eigen::Vector3d gridPoint;
 
+        // If grid has non defined points it is assymetric
         if (target.gridPoint(r,c)(0)==-1){
           assymetric = true;
           continue;
@@ -780,6 +781,8 @@ bool OmniProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<GridCa
 
       // MIN_CORNERS is an arbitrary threshold for the number of corners
       size_t MIN_CORNERS = 4;
+
+      // If assymetric grid, there is not necessarily more than one square/marker segment in each row
       if (assymetric)
         MIN_CORNERS = 2;
       if (count >= MIN_CORNERS)

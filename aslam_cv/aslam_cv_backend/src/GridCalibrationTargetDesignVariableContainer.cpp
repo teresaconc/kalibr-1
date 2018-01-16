@@ -52,4 +52,5 @@ boost::shared_ptr<cameras::GridCalibrationTargetBase> GridCalibrationTargetDesig
   return _target;
 }
 
+
 }  // namespace aslam

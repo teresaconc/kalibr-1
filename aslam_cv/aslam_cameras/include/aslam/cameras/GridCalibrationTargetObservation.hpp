@@ -122,6 +122,14 @@ class GridCalibrationTargetObservation {
 
   /// \brief return true if the class has at least one successful observation
   bool hasSuccessfulObservation() const;
+  
+  std::vector<int> getObservedTagIds(){
+    return _tagIds;
+  };
+  
+  void setTagIds(const std::vector<int> &tagIds){
+    _tagIds = tagIds;
+  };
 
  private:
   /// \brief the target being observed
@@ -151,6 +159,8 @@ class GridCalibrationTargetObservation {
 
   /// \brief has the extrinsics been set?
   bool _T_t_c_isSet;
+
+  std::vector <int> _tagIds;
 
 
   ///////////////////////////////////////////////////

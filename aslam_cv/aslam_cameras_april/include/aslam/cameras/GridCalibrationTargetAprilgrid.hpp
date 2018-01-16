@@ -91,7 +91,7 @@ class GridCalibrationTargetAprilgrid : public GridCalibrationTargetBase {
   /// \brief extract the calibration target points from an image and write to an observation
   bool computeObservation(const cv::Mat & image,
                           Eigen::MatrixXd & outImagePoints,
-                          std::vector<bool> &outCornerObserved) const;
+                          std::vector<bool> &outCornerObserved, bool isDepth = false) const;
 
  private:
   /// \brief initialize the object

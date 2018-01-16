@@ -185,7 +185,7 @@ def stereoCalibrate(camL_geometry, camH_geometry, obslist, distortionActive=Fals
         return success, baseline_HL
 
 
-def calibrateIntrinsics(cam_geometry, obslist, distortionActive=True, intrinsicsActive=True):
+def calibrateIntrinsics(cam_geometry, obslist, distortionActive=True, intrinsicsActive=True, problem = None):
     #verbose output
     if sm.getLoggingLevel()==sm.LoggingLevel.Debug:
         d = cam_geometry.geometry.projection().distortion().getParameters().flatten()
@@ -196,7 +196,8 @@ def calibrateIntrinsics(cam_geometry, obslist, distortionActive=True, intrinsics
     ############################################
     ## solve the bundle adjustment
     ############################################
-    problem = aopt.OptimizationProblem()
+    if problem is None:
+        problem = aopt.OptimizationProblem()
     
     #add camera dvs
     cam_geometry.setDvActiveStatus(intrinsicsActive, distortionActive, False)
@@ -254,6 +255,8 @@ def calibrateIntrinsics(cam_geometry, obslist, distortionActive=True, intrinsics
         e2 = np.array([ e.evaluateError() for e in reprojectionErrors ])
         sm.logDebug( " Reprojection error squarred (camL):  mean {0}, median {1}, std: {2}".format(np.mean(e2), np.median(e2), np.std(e2) ) )
     
+    if problem is not None:
+        return True
     #run intrinsic calibration
     try: 
         retval = optimizer.optimize()

@@ -1,5 +1,4 @@
 #include <opencv2/core/eigen.hpp>
-
 #include <Eigen/StdVector>
 
 namespace aslam {
@@ -37,8 +36,7 @@ PinholeProjection<DISTORTION_T>::PinholeProjection(double focalLengthU,
                                                    double imageCenterV,
                                                    int resolutionU,
                                                    int resolutionV, 
-                                                   distortion_t distortion
-                                                  )
+                                                   distortion_t distortion)
     : _fu(focalLengthU),
       _fv(focalLengthV),
       _cu(imageCenterU),
@@ -88,7 +86,6 @@ bool PinholeProjection<DISTORTION_T>::euclideanToKeypoint(
   double rz = 1.0 / p[2];
   outKeypoint[0] = p[0] * rz;
   outKeypoint[1] = p[1] * rz;
-
 
   _distortion.distort(outKeypoint);
 
@@ -169,7 +166,6 @@ bool PinholeProjection<DISTORTION_T>::homogeneousToKeypoint(
     const Eigen::MatrixBase<DERIVED_P> & ph,
     const Eigen::MatrixBase<DERIVED_K> & outKeypoint,
     const Eigen::MatrixBase<DERIVED_JP> & outJp) const {
-
   EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE_OR_DYNAMIC(
       Eigen::MatrixBase<DERIVED_P>, 4);
   EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE_OR_DYNAMIC(
@@ -213,7 +209,6 @@ bool PinholeProjection<DISTORTION_T>::keypointToEuclidean(
 
   kp[0] = (kp[0] - _cu) / _fu;
   kp[1] = (kp[1] - _cv) / _fv;
-  
   _distortion.undistort(kp);  // revert distortion
 
   Eigen::MatrixBase<DERIVED_P> & outPoint = const_cast<Eigen::MatrixBase<
@@ -615,7 +610,6 @@ public:
     std::vector<cv::Point2d> ipts;
 
     double d = hypot(x1-x2, y1-y2);
-
     if (d > r1 + r2) {
       // circles are separate
       return ipts;
@@ -697,8 +691,7 @@ public:
   {
     double median;
     size_t size = values.size();
-    std::sort(values.begin(), values.end());
-   
+    std::sort(values.begin(), values.end());  
     if (size%2 == 0)
         median = (values[size / 2 - 1] + values[size / 2]) / 2;
     else
@@ -726,14 +719,11 @@ bool PinholeProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<Gri
   _rv = observations[0].imRows();
   _distortion.clear();
 
-  //bool assymetricGrid =false;
+  //Later Updated. Initialize for no errors in the future
+  _fu = 300;
+  _fv = 300;
   //process all images
   size_t nImages = observations.size();
-
-  /*if (dynamic_cast<GridCalibrationTargetAssymetricAprilgrid*>(&observations[0].target()) != nullptr)
-  {
-    assymetricGrid = true;
-  }*/
 
   // Initialize focal length
   // C. Hughes, P. Denny, M. Glavin, and E. Jones,
@@ -742,8 +732,8 @@ bool PinholeProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<Gri
   // Find circles from rows of chessboard corners, and for each pair
   // of circles, find vanishing points: v1 and v2.
   // f = ||v1 - v2|| / PI;
-
   std::vector<double> f_guesses;
+  int MIN_TAGS = 3; 
 
   for (size_t i=0; i<nImages; ++i) {
     const GridCalibrationTargetObservation& obs = observations.at(i);
@@ -753,18 +743,16 @@ bool PinholeProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<Gri
     std::vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> center(target.rows());
     double radius[target.rows()];
 
-    int count=0;
-    int MIN_TAGS = 3; 
-    //If the grid is assymetric we never see all grid Points. Initialization can't be the same as for the symmetric case.
+    int count = 0;
+    //If the grid is assymetric we never see all grid Points.
+    //Initialization can't be the same as for the symmetric case.
     bool skipImage=false;
     bool assymetric=false;
     for (size_t r=0; r<target.rows(); ++r) {
       std::vector<cv::Point2d> circle;
-
       for (size_t c=0; c<target.cols(); ++c) {
         Eigen::Vector2d imagePoint;
         Eigen::Vector3d gridPoint;
-        //For low resolution can fail -> change method to allow less observations or initialize with constant value
         if (target.gridPoint(r,c)(0)==-1){
           assymetric = true;
           continue;
@@ -776,19 +764,16 @@ bool PinholeProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<Gri
         else if(!assymetric)
           //skip this image if the board view is not complete
           skipImage=true;
-
       }
       
       PinholeHelpers::fitCircle(circle, center[r](0), center[r](1), radius[r]);
     }
-    //If we see two points of the same tag we have at least one horizontal line. See at least 3 tags? 2 tags?
+    // Assymetric case: If a marker is detected there is at least one horizontal line to compute vanishing lines
       if(count >= MIN_TAGS*4 && assymetric)
         skipImage=false;
 
-    if(skipImage){
-      continue;
-    }
-    
+    if(skipImage)
+      continue;    
 
     for (size_t j=0; j<target.rows(); ++j)
     {
@@ -797,13 +782,14 @@ bool PinholeProjection<DISTORTION_T>::initializeIntrinsics(const std::vector<Gri
         // find distance between pair of vanishing points which
         // correspond to intersection points of 2 circles
         std::vector < cv::Point2d > ipts;
-        if( std::isinf(center[j](0)) || std::isnan(center[j](0)) || std::isinf(center[k](0)) || std::isnan(center[k](0)) )
+        // Account for cases where the initialization may fail due to wherever reason
+        if ( std::isinf(center[j](0)) || std::isnan(center[j](0)) || std::isinf(center[k](0)) || std::isnan(center[k](0)) )
              continue;
         ipts = PinholeHelpers::intersectCircles(center[j](0), center[j](1),
                                                 radius[j], center[k](0), center[k](1), radius[k]);
        
         if (ipts.size()<2)
-            continue;
+          continue;
 
          double f_guess = cv::norm(ipts.at(0) - ipts.at(1)) / M_PI;
          f_guesses.push_back(f_guess);
@@ -835,7 +821,6 @@ size_t PinholeProjection<DISTORTION_T>::computeReprojectionError(
 
   for (size_t i = 0; i < obs.target()->size(); ++i) {
     Eigen::Vector2d y, yhat;
-
     if (obs.imagePoint(i, y)
         && euclideanToKeypoint(T_camera_target * obs.target()->point(i),
                                yhat)) {
@@ -854,12 +839,12 @@ template<typename DISTORTION_T>
 bool PinholeProjection<DISTORTION_T>::estimateTransformation(
     const GridCalibrationTargetObservation & obs,
     sm::kinematics::Transformation & out_T_t_c) const {
-  
   std::vector<cv::Point2f> Ms;
   std::vector<cv::Point3f> Ps;
 
   // Get the observed corners in the image and target frame
   obs.getCornersImageFrame(Ms);
+  //Get from DV?
   obs.getCornersTargetFrame(Ps);
  
 
@@ -885,7 +870,6 @@ bool PinholeProjection<DISTORTION_T>::estimateTransformation(
     }
   }
   
-  
   Ps.resize(count);
   Ms.resize(count);
 
@@ -897,7 +881,6 @@ bool PinholeProjection<DISTORTION_T>::estimateTransformation(
   if (Ps.size() < 4)
     return false;
   
-
   // Call the OpenCV pnp function.  
    cv::solvePnP(Ps, Ms, cv::Mat::eye(3, 3, CV_64F), distCoeffs, rvec, tvec);
 
@@ -915,7 +898,6 @@ bool PinholeProjection<DISTORTION_T>::estimateTransformation(
   out_T_t_c.set(T_camera_model.inverse());
   return true;
 }
-
 
 }  // namespace cameras
 

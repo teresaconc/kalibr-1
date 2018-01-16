@@ -75,7 +75,8 @@ class GridCalibrationTargetAssymetricAprilgrid : public GridCalibrationTargetBas
   /// \brief extract the calibration target points from an image and write to an observation
    bool computeObservation(const cv::Mat & image,
                           Eigen::MatrixXd & outImagePoints,
-                          std::vector<bool> &outCornerObserved) const;
+                          std::vector<bool> &outCornerObserved,
+                          std::vector<int> &tagIds) const;
  
  private:
   void initialize();
@@ -96,7 +97,9 @@ class GridCalibrationTargetAssymetricAprilgrid : public GridCalibrationTargetBas
 
   //serialization ctor
   GridCalibrationTargetAssymetricAprilgrid();
-
+  std::vector<TargetPoint> getTargetPoints(){
+    return _targetPoints;
+  }
  protected:
   friend class boost::serialization::access;
 

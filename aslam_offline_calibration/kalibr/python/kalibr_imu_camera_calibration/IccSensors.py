@@ -8,13 +8,19 @@ import kalibr_common as kc
 import kalibr_errorterms as ket
 import IccCalibrator as ic
 
+import kalibr_camera_calibration as kcc
+import aslam_cv_backend as acvb
+
 import cv2
 import sys
 import math
 import numpy as np
 import pylab as pl
 import scipy.optimize
-
+cameraModels = { 'pinhole-radtan': acvb.DistortedPinhole,
+                 'pinhole-equi':   acvb.EquidistantPinhole,
+                 'pinhole-fov':    acvb.FovPinhole,
+                 'omni-radtan':    acvb.DistortedOmni }
 
 def initCameraBagDataset(bagfile, topic, from_to=None, perform_synchronization=False):
     print "Initializing camera rosbag dataset reader:"
@@ -38,13 +44,18 @@ def initImuBagDataset(bagfile, topic, from_to=None, perform_synchronization=Fals
 #mono camera
 class IccCamera():
     def __init__(self, camConfig, targetConfig, dataset, reprojectionSigma=1.0, showCorners=True, \
-                 showReproj=True, showOneStep=False):
+                 showReproj=True, showOneStep=False, recomputeIntrinsics=False, verbose = False):
         
         #store the configuration
         self.dataset = dataset
         self.camConfig = camConfig
         self.targetConfig = targetConfig
-        
+
+        camera_model, intrinsics = camConfig.getIntrinsics()
+        dist_model, dist_coeff = camConfig.getDistortion()
+        modelName = camera_model + '-' + dist_model
+        cameraModel = cameraModels[modelName]
+        self.gridDV = []
         # Corner uncertainty
         self.cornerUncertainty = reprojectionSigma
 
@@ -54,17 +65,80 @@ class IccCamera():
         #initialize timeshift prior to zero
         self.timeshiftCamToImuPrior = 0.0
         
+        print "recompute intrinsics"
+        print recomputeIntrinsics
         #initialize the camera data
-        self.camera = kc.AslamCamera.fromParameters( camConfig )
-        
+        if recomputeIntrinsics:
+            self.camera = kcc.CameraGeometry(cameraModel, targetConfig, dataset,verbose)
+            noTransformation = True
+            self.keypointType = acv.Keypoint2
+
+            if camera_model == 'pinhole':
+            
+                if dist_model == 'radtan':
+                   
+                    self.frameType = cv.DistortedPinholeFrame
+                    self.reprojectionErrorType = acvb.DistortedPinholeReprojectionErrorSimple
+                    self.undistorterType = acv.PinholeUndistorterNoMask
+                    
+                elif dist_model == 'equidistant':                
+                    self.frameType = acv.EquidistantDistortedPinholeFrame
+                    self.reprojectionErrorType = acvb.EquidistantDistortedPinholeReprojectionErrorSimple
+                    self.undistorterType = acv.EquidistantPinholeUndistorterNoMask
+                    
+                elif dist_model == 'fov':               
+                    self.frameType = acv.FovDistortedPinholeFrame
+                    self.reprojectionErrorType = acvb.FovDistortedPinholeReprojectionErrorSimple
+                    self.undistorterType = acv.FovPinholeUndistorterNoMask
+                else:
+                    self.frameType = acv.PinholeFrame
+                    self.reprojectionErrorType = acvb.PinholeReprojectionErrorSimple
+                    
+            elif camera_model == 'omni':
+                          
+                if dist_model == 'radtan':                
+                    self.frameType = acv.DistortedOmniFrame
+                    self.reprojectionErrorType = acvb.DistortedOmniReprojectionErrorSimple
+                    self.undistorterType = acv.OmniUndistorterNoMask
+                    
+                elif dist_model == 'equidistant':
+                    
+                    print "Omni with equidistant model not yet supported!"
+                    sys.exit(0)
+                    self.frameType = acv.DistortedOmniFrame
+                    self.reprojectionErrorType = acvb.EquidistantDistortedOmniReprojectionErrorSimple
+
+                elif dist_model == 'none':
+                    print("camera model omni needs a distortion model! (none is invalid)")
+                    sys.exit(0)
+                    
+            else:
+                print "Unknown camera model"
+                sys.exit(0)
+
+        else:
+            self.camera = kc.AslamCamera.fromParameters( camConfig )
+            noTransformation = False
+
         #extract corners
         self.setupCalibrationTarget( targetConfig, showExtraction=showCorners, showReproj=showReproj, imageStepping=showOneStep )
-        multithreading = not (showCorners or showReproj or showOneStep)
-        self.targetObservations = kc.extractCornersFromDataset(self.dataset, self.detector, multithreading=multithreading)
+        multithreading = not (showCorners or showReproj or showOneStep) ##Add multithread for intrinsics?
+        multithreading = False
+       
+        self.targetObservations = kc.extractCornersFromDataset(self.dataset, self.detector, multithreading=multithreading,noTransformation=noTransformation)
+        
+
+        if recomputeIntrinsics:
+            if not self.camera.initGeometryFromObservations(self.targetObservations):
+                raise RuntimeError("Could not initialize the intrinsics for camera with topic: {0}. Try to use --verbose and check whether the calibration target extraction is successful.".format(topic))
+            
+            print "\tProjection initialized to: %s" %  self.camera.geometry.projection().getParameters().flatten()
+            print "\tDistortion initialized to: %s" %  self.camera.geometry.projection().distortion().getParameters().flatten()
         
         #an estimate of the gravity in the world coordinate frame  
         self.gravity_w = np.array([9.80655, 0., 0.])
-        
+    
+    ##Add ICCTarget later
     def setupCalibrationTarget(self, targetConfig, showExtraction=False, showReproj=False, imageStepping=False):
         
         #load the calibration target configuration
@@ -119,6 +193,27 @@ class IccCamera():
 
             grid = acv_april.GridCalibrationTargetAssymetricAprilgrid(vectorTags,
                                                                  options)
+        elif targetType == 'unknown_target':
+            options = acv_april.AprilgridOptions()
+            #enforce more than one row --> pnp solution can be bad if all points are almost on a line...
+            options.minTagsForValidObs  = 1
+            options.showExtractionVideo = showCorners
+            #options.maxSubpixDisplacement2 = 2
+            #options.doSubpixRefinement = False
+            vectorTags =[]
+
+            for tag in targetParams['tags']:
+                structTag = acv_april.TargetPoint()
+                structTag.x = tag["pos"][0]
+                structTag.y = tag["pos"][1]
+                structTag.size =tag["size"]
+                vectorTags.append(structTag)
+
+            #necessario?? depois mudar a implementacaoo. DO outro lado detecao dependente de ser dv ou nao
+            self.grid = acv_april.GridCalibrationTargetAssymetricAprilgrid(vectorTags,
+                                                                 options)
+
+
         else:
             raise RuntimeError( "Unknown calibration target." )
                           
@@ -290,7 +385,9 @@ class IccCamera():
         
     #initialize a pose spline using camera poses (pose spline = T_wb)
     def initPoseSplineFromCamera(self, splineOrder=6, poseKnotsPerSecond=100, timeOffsetPadding=0.02):
-        T_c_b = self.T_extrinsic.T()        
+        T_c_b = self.T_extrinsic.T()  
+        print "extrinsics"
+        print T_c_b      
         pose = bsplines.BSplinePose(splineOrder, sm.RotationVector() )
                 
         # Get the checkerboard times.
@@ -341,8 +438,26 @@ class IccCamera():
         self.cameraTimeToImuTimeDv = aopt.Scalar(0.0)
         self.cameraTimeToImuTimeDv.setActive( not noTimeCalibration )
         problem.addDesignVariable(self.cameraTimeToImuTimeDv, ic.CALIBRATION_GROUP_ID)
+
+    def addTargetView(self,problem, rig_observations, T_tc_guess, camera, force=False):
+        #create the problem for this batch and try to add it 
         
-    def addCameraErrorTerms(self, problem, poseSplineDv, T_cN_b, blakeZissermanDf=0.0, timeOffsetPadding=0.0):
+        print type(T_tc_guess)
+        batch_problem = kcc.CalibrationTargetOptimizationProblem.fromTargetViewObservations(camera, self.gridDV, None, T_tc_guess, rig_observations, False)
+        problem.estimator_return_value = problem.estimator.addBatch(batch_problem, force)
+        
+        #if self.estimator_return_value.numIterations >= self.optimizerOptions.maxIterations:
+        #    sm.logError("Did not converge in maxIterations... restarting...")
+        #    raise OptimizationDiverged
+        
+        success = problem.estimator_return_value.batchAccepted
+        if success:
+            sm.logDebug("The estimator accepted this batch")
+        else:
+            sm.logDebug("The estimator did not accept this batch")
+        return success
+
+    def addCameraErrorTerms(self, problem, poseSplineDv, T_cN_b, blakeZissermanDf=0.0, timeOffsetPadding=0.0, isDepth = False):
         print
         print "Adding camera error terms ({0})".format(self.dataset.topic)
         
@@ -351,7 +466,7 @@ class IccCamera():
         iProgress.sample()
 
         allReprojectionErrors = list()
-        error_t = self.camera.reprojectionErrorType
+        error_t = self.reprojectionErrorType
         
         for obs in self.targetObservations:
             # Build a transformation expression for the time.
@@ -370,10 +485,19 @@ class IccCamera():
             #T_b_w: from world to imu coords
             #T_cN_b: from imu to camera N coords
             T_c_w = T_cN_b  * T_b_w
-            
+            #T_c_guess = sm.Transformation( T_c_w )
+            self.addTargetView(problem,obs,T_c_w, self.camera)
+
+            #NOT LOOKING FOR OUTLIERS
+            tagIds = obs.getObservedTagIds()
+            if not tagIds:
+                continue
+            else:
+                print len(tagIds)
             #get the image and target points corresponding to the frame
             imageCornerPoints =  np.array( obs.getCornersImageFrame() ).T
-            targetCornerPoints = np.array( obs.getCornersTargetFrame() ).T
+            #targetCornerPoints = np.array( obs.getCornersTargetFrame() ).T
+            #targetCornerPoints = self.gridDV.getTarget().getTargetPoints()
             
             #setup an aslam frame (handles the distortion)
             frame = self.camera.frameType()
@@ -392,8 +516,37 @@ class IccCamera():
             
             reprojectionErrors=list()
             for pidx in range(0,imageCornerPoints.shape[1]):
-                #add all target points
-                targetPoint = np.insert( targetCornerPoints.transpose()[pidx], 3, 1)
+                if tagIds[pidx // 4] in self.detectedIds:
+                    pos = self.detectedIds.index(tagIds[pidx // 4])
+                    tagDv = self.gridDV[pos]
+                    targetPoint = np.insert(tagDv.value(), 3, 1)
+                    if isDepth:
+                        p = T_c_w * aopt.HomogeneousExpression( targetPoint)
+                        p[2]= imageCornerPoints[pidx]
+                        targetPoint = T_c_w.inverse() * aopt.HomogeneousExpression( targetPoint )
+                        tagDv.updateImplementation(targetPoint,3)
+                    else:
+                        targetPoint = np.insert(tagDv.value(), 3, 1)
+                
+                else:
+                    if isDepth:
+                        targetPoint = np.array(0,0,imageCornerPoints[pidx])
+                        p = T_c_w.inverse() *  aopt.HomogeneousExpression( targetPoint.transpose() )
+                        tagDv = aopt.DesignVariableVector(np.insert(p, 3, 1))
+                    else:
+                        tagDv = aopt.DesignVariableVector(zeros(3))
+
+                    self.gridDV.append(tagDv)
+                    self.detectedIds.append(tagIds[pidx // 4])
+                    problem.addDesignVariable(tagDv)
+                    pos = len(self.gridDV) - 1
+                
+                #Add error term for Z???
+                #See better intrinsics??? show results
+                if isDepth:
+                    continue
+                targetPoint = np.insert(self.gridDV[pos].value(), 3, 1)
+
                 p = T_c_w *  aopt.HomogeneousExpression( targetPoint )
              
                 #build and append the error term
@@ -438,6 +591,12 @@ class IccCameraChain():
                                            parsed.bag_from_to, parsed.perform_synchronization)
             
             #create the camera
+            #Change this with parameter
+            if camNr == 0:
+                recomputeIntrinsics = True
+            else:
+                recomputeIntrinsics = False
+
             self.camList.append( IccCamera( camConfig, 
                                             targetConfig, 
                                             dataset, 
@@ -445,7 +604,10 @@ class IccCameraChain():
                                             reprojectionSigma=parsed.reprojection_sigma, 
                                             showCorners=parsed.showextraction,
                                             showReproj=parsed.showextraction, 
-                                            showOneStep=parsed.extractionstepping) )  
+                                            showOneStep=parsed.extractionstepping,
+                                            recomputeIntrinsics = recomputeIntrinsics, 
+                                            verbose = (parsed.verbose or parsed.showextraction)
+                                            ))
                 
         self.chainConfig = chainConfig
         
@@ -540,7 +702,7 @@ class IccCameraChain():
                 baselinedv_group_id = ic.CALIBRATION_GROUP_ID
             else:
                 noExtrinsics = noChainExtrinsics
-                baselinedv_group_id = ic.HELPER_GROUP_ID
+                baselinedv_group_id = ic.CALIBRATION_GROUP_ID
             cam.addDesignVariables(problem, noExtrinsics, noTimeCalibration, baselinedv_group_id=baselinedv_group_id)
     
     #add the reprojection error terms for all cameras in the chain
@@ -549,7 +711,8 @@ class IccCameraChain():
         #add the induviduak error terms for all cameras
         for camNr, cam in enumerate(self.camList):
             #add error terms for the first chain element
-            if camNr == 0:
+            #when does the recompute extrinsics takes plaec??????
+            if camNr == 0 :
                 #initialize the chain with first camerea ( imu to cam0)
                 T_chain = cam.T_c_b_Dv.toExpression()
             else:

@@ -2,7 +2,6 @@
 // if you are using the numpy_eigen interface
 #include <aslam/cameras/GridCalibrationTargetAprilgrid.hpp>
 #include <aslam/cameras/GridCalibrationTargetAssymetricAprilgrid.hpp>
-
 #include <numpy_eigen/boost_python_headers.hpp>
 #include <sm/python/boost_serialization_pickle.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
@@ -53,5 +52,6 @@ BOOST_PYTHON_MODULE(libaslam_cameras_april_python)
       .def(init<boost::python::list>(
           "GridCalibrationTargetAssymetricAprilgrid(boost::python::list vector_list)"))
       .def(init<>("Do not use the default constructor. It is only necessary for the pickle interface"))
+      .def("getTargetPoints", &GridCalibrationTargetAssymetricAprilgrid::getTargetPoints)
       .def_pickle(sm::python::pickle_suite<GridCalibrationTargetAssymetricAprilgrid>());
 }

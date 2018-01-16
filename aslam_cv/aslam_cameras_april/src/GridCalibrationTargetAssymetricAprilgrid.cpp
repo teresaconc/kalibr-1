@@ -175,13 +175,18 @@ void GridCalibrationTargetAssymetricAprilgrid::createGridPoints() {
 /// \brief extract the calibration target points from an image and write to an observation
  bool GridCalibrationTargetAssymetricAprilgrid::computeObservation(
     const cv::Mat & image, Eigen::MatrixXd & outImagePoints,
-    std::vector<bool> &outCornerObserved ) const  {
+    std::vector<bool> &outCornerObserved, std::vector<int> &tagIds
+ ) const  {
 
   bool success = true;
-    
+  bool isDepth = false;
+
+    if (image.cols <500)
+    isDepth = true;
+
   // detect the tags
   std::vector<AprilTags::TagDetection> detections = _tagDetector->extractTags(image);
-
+  std::cout << "len of detections " << detections.size() << std::endl;
  /* handle the case in which a tag is identified but not all tag
    * corners are in the image (all data bits in image but border
    * outside). tagCorners should still be okay as apriltag-lib
@@ -367,12 +372,13 @@ void GridCalibrationTargetAssymetricAprilgrid::createGridPoints() {
 
     // get the tag id
     unsigned int tagId = detections[i].id;
-
+    tagIds.push_back(tagId);
     // calculate the grid idx for all four tag corners given the tagId and cols
    
         //unsigned pos= tagId_pos[tagId];
         //unsigned int baseId = (int) (pos / (_cols / 2)) * _cols * 2
         //  + (pos % (_cols / 2)) * 2;
+      /*
       it = std::find_if(_targetPoints.begin(), _targetPoints.end(), 
         boost::bind(&TargetPoint::id, _1) == tagId);
       unsigned int pIdx[] = {0,0,0,0};
@@ -382,19 +388,32 @@ void GridCalibrationTargetAssymetricAprilgrid::createGridPoints() {
         pIdx[1]= it->row[0]*_cols + it->col[1];
         pIdx[2] = it->row[1]*_cols + it->col[1];
         pIdx[3] =it->row[1]*_cols + it->col[0]  ;
-      }
-
+      }*/
+      
      
 
    // unsigned int pIdx[] = { baseId, baseId + 1, baseId + (unsigned int) _cols
      //   + 1, baseId + (unsigned int) _cols };
+      
+
+      //VERSION FOR UNKNWON TARGET
 
     // add four points per tag
     for (int j = 0; j < 4; j++) {
       //refined corners
+      
       double corner_x = tagCorners.row(4 * i + j).at<float>(0);
       double corner_y = tagCorners.row(4 * i + j).at<float>(1);
 
+      //Each detection has 
+      if (isDepth)
+        outImagePoints.row(4*i+j) = Eigen::Matrix<double, 1, 2>(image.at<double>(corner_x,corner_y),
+                                                                0);
+      else
+        outImagePoints.row(4*i+j) = Eigen::Matrix<double, 1, 2>(corner_x,
+                                                                corner_y);
+      outCornerObserved[4*i+j] = true;
+/*
       //raw corners
       double cornerRaw_x = tagCornersRaw.row(4 * i + j).at<float>(0);
       double cornerRaw_y = tagCornersRaw.row(4 * i + j).at<float>(1);
@@ -408,7 +427,7 @@ void GridCalibrationTargetAssymetricAprilgrid::createGridPoints() {
       //add all points, but only set active if the point has not moved to far in the subpix refinement
       outImagePoints.row(pIdx[j]) = Eigen::Matrix<double, 1, 2>(corner_x,
                                                                 corner_y);
-      
+      outImagePointstagId
       if (subpix_displacement_squarred <= _options.maxSubpixDisplacement2) {
         outCornerObserved[pIdx[j]] = true;
       } else {
@@ -419,9 +438,10 @@ void GridCalibrationTargetAssymetricAprilgrid::createGridPoints() {
         }
         break;
       }
-
+*/
 
     }
+
   }
 
   //succesful observation

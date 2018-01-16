@@ -43,7 +43,7 @@ namespace aslam {
       double evaluateError();
 
       /// \brief evaluate the Jacobians.
-      void evaluateJacobians(JacobianContainer & outJacobians) const;
+      void evaluateJacobians(JacobianContainer & outJacobians) ;
 
       /// \brief evaluate the Jacobians using finite differences.
       void evaluateJacobiansFiniteDifference(JacobianContainer & outJacobians);

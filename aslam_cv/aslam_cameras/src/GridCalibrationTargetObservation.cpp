@@ -33,7 +33,6 @@ void GridCalibrationTargetObservation::setTarget(
   _points = Eigen::MatrixXd::Zero(target->size(), 2);
   _success.clear();
   _success.resize(target->size(), false);
-
 }
 
 /// \brief get all (observed) corners in image coordinates

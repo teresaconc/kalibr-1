@@ -50,7 +50,7 @@ class CameraGeometry(object):
         self.dv.distortionDesignVariable().setActive(distortionActive)
         self.dv.shutterDesignVariable().setActive(shutterActice)
 
-    def initGeometryFromObservations(self, observations):
+    def initGeometryFromObservations(self, observations, problem = None):
         #obtain focal length guess
         success = self.geometry.initializeIntrinsics(observations)
         if not success:
@@ -59,12 +59,20 @@ class CameraGeometry(object):
         #in case of an omni model, first optimize over intrinsics only
         #(--> catch most of the distortion with the projection model)
         if self.model == acvb.DistortedOmni:
-            success = kcc.calibrateIntrinsics(self, observations, distortionActive=False)
+            if problem is not None:
+                success = kcc.calibrateIntrinsics(self, observations, False,problem)
+            else:
+                success = kcc.calibrateIntrinsics(self, observations, distortionActive=False)
+
             if not success:
                 sm.logError("initialization of intrinsics for cam with topic {0} failed  ".format(self.dataset.topic))
         
         #optimize for intrinsics & distortion    
-        success = kcc.calibrateIntrinsics(self, observations)
+        if problem is not None:
+            success = kcc.calibrateIntrinsics(self, observations, problem)
+        else:
+            success = kcc.calibrateIntrinsics(self, observations)
+
         if not success:
             sm.logError("initialization of intrinsics for cam with topic {0} failed  ".format(self.dataset.topic))
         
@@ -160,8 +168,12 @@ class CalibrationTarget(object):
 
 class CalibrationTargetOptimizationProblem(ic.CalibrationOptimizationProblem):        
     @classmethod
-    def fromTargetViewObservations(cls, cameras, target, baselines, T_tc_guess, rig_observations, useBlakeZissermanMest=True):
-        rval = CalibrationTargetOptimizationProblem()        
+    def fromTargetViewObservations(cls, cameras, target, baselines, T_tc_guess, rig_observations, useBlakeZissermanMest=True, problem = None):
+        
+        if problem is not None:
+            rval = problem
+        else:
+            rval = CalibrationTargetOptimizationProblem()        
 
         #store the arguements in case we want to rebuild a modified problem
         rval.cameras = cameras
@@ -169,10 +181,9 @@ class CalibrationTargetOptimizationProblem(ic.CalibrationOptimizationProblem):
         rval.baselines = baselines
         rval.T_tc_guess = T_tc_guess
         rval.rig_observations = rig_observations
-        
+        print T_tc_guess
         # 1. Create a design variable for this pose
         T_target_camera = T_tc_guess
-
         rval.dv_T_target_camera = aopt.TransformationDv(T_target_camera)
         for i in range(0, rval.dv_T_target_camera.numDesignVariables()):
             rval.addDesignVariable( rval.dv_T_target_camera.getDesignVariable(i), TRANSFORMATION_GROUP_ID)

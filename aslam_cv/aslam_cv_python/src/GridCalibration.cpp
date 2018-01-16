@@ -262,7 +262,6 @@ void exportGridCalibration() {
     .def_readwrite("showExtractionVideo", &GridCalibrationTargetCheckerboard::CheckerboardOptions::showExtractionVideo)
     .def_pickle(sm::python::pickle_suite<GridCalibrationTargetCheckerboard::CheckerboardOptions>());
 
-
   class_<GridCalibrationTargetCheckerboard, bases<GridCalibrationTargetBase>,
       boost::shared_ptr<GridCalibrationTargetCheckerboard>, boost::noncopyable>(
       "GridCalibrationTargetCheckerboard", init<size_t, size_t, double, double, GridCalibrationTargetCheckerboard::CheckerboardOptions>(

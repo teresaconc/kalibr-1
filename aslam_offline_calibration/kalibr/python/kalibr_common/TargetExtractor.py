@@ -18,6 +18,7 @@ def multicoreExtractionWrapper(detector, taskq, resultq, clearImages, noTransfor
         stamp = task[1]
         image = task[2]
         if noTransformation:
+            print idx
             success, obs = detector.findTargetNoTransformation(stamp, np.array(image))
         else:
             success, obs = detector.findTarget(stamp, np.array(image))
@@ -33,10 +34,11 @@ def extractCornersFromDataset(dataset, detector, multithreading=False, numProces
     # prepare progess bar
     iProgress = sm.Progress2(numImages)
     iProgress.sample()
-
+    print detector
     if multithreading:   
         if not numProcesses:
             numProcesses = max(1,multiprocessing.cpu_count()-1)
+
         try:      
             manager = multiprocessing.Manager()
             resultq = manager.Queue()
@@ -44,6 +46,7 @@ def extractCornersFromDataset(dataset, detector, multithreading=False, numProces
             taskq = manager2.Queue() 
             for idx, (timestamp, image) in enumerate(dataset.readDataset()):
                 taskq.put( (idx, timestamp, image) )
+
 
             plist=list()
 
